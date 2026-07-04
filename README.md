@@ -49,3 +49,65 @@ ordreg MiApp
 
 enviareg MiApp
 ```
+
+---
+
+## 📁 Estructura
+
+```bash
+nodegdt/
+├── bin/
+│   └── nodegdt.js    # CLI
+├── src/
+│   ├── lexer.js      # Analizador léxico
+│   ├── parser.js     # Analizador sintáctico
+│   ├── transpiler.js # Traductor a JS
+│   ├── runtime.js    # Motor de ejecución
+│   └── cache.js      # Sistema de caché
+└── index.js          # Punto de entrada
+```
+
+---
+
+## 🔐 Licencia 
+
+MIT - República Dominicana (creado por Félix)
+
+
+---
+
+### `examples/index.gdt`
+
+```gdt
+( index.gdt - Ejemplo de bot con NodeGDT )
+
+traereg fs pós 'fs-extra'
+
+ordreg MiBot
+    net-nom = 'KazumaBot'
+    net-vida = 'sombrx'
+    
+    ejecutax asincrog main = f:
+        sist.sux '🚀 ' + net-nom + ' iniciando...'
+        
+        etemdreg:
+            sist.sux '✅ Sistema listo'
+            net-vida = 'luqx'
+            
+            mientrax net-vida == 'luqx':
+                esperax temp.sombx(5)
+                sist.sux '💓 ' + net-nom + ' vivx'
+                
+                sieg net-vida == 'sombrx':
+                    sist.krx '⚠️ Estado crítico'
+                    rompx
+        
+        faixtg err:
+            sist.krx '💀 Error: ' + err
+            net-vida = 'sombrx'
+
+enviareg MiBot
+
+( Ejecutar )
+esperax MiBot.main()
+```
