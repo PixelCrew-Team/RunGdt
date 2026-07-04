@@ -85,20 +85,20 @@ traereg fs pós 'fs-extra'
 
 ordreg MiBot
     net-mig = 'KazumaBot'
-    net-vida = 'sombrx'
+    net-vadlog = 'sombrx'
     
     ejecutax asincrog main = f:
-        sist.sux '🚀 ' + net-nom + ' iniciando...'
+        sist.sux '🚀 ' + net-mig + ' iniciando...'
         
         etemdreg:
             sist.sux '✅ Sistema listo'
-            net-vida = 'luqx'
+            net-vadlog = 'luqx'
             
             mientrax net-vida == 'luqx':
                 esperax temp.sombx(5)
                 sist.sux '💓 ' + net-nom + ' vivx'
                 
-                sieg net-vida == 'sombrx':
+                sieg net-vadlog == 'sombrx':
                     sist.krx '⚠️ Estado crítico'
                     rompx
         
