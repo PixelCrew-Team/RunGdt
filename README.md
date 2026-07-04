@@ -84,7 +84,7 @@ MIT - República Dominicana (creado por Félix)
 traereg fs pós 'fs-extra'
 
 ordreg MiBot
-    net-nom = 'KazumaBot'
+    net-mig = 'KazumaBot'
     net-vida = 'sombrx'
     
     ejecutax asincrog main = f:
