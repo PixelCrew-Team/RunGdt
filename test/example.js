@@ -1,50 +1,47 @@
-// ==========================================
-// ping.js - Comando de ping para Kazuma
-// Versión 1.0 - Traducido a JavaScript
-// ==========================================
+( ========================================== )
+( ping.gdt - Comando de ping para Kazuma )
+( Versión 1.0 - GetDomit Nativo )
+( ========================================== )
 
-const config = require('../config.gdt');
+bring config from '../config.gdt'
 
-class PingCommand {
-    constructor() {
-        this.prefix = config.prefix;
-        this.name = config.name;
-        this.version = config.version;
-    }
+define PingCommand
+    own prefix = config.prefix
+    own name = config.name
+    own version = config.version
     
-    async run(kan, pulse) {
-        const to = pulse.to;
-        const msg = pulse.message.body;
+    async run = (kan, pulse) => {
+        leave to = pulse.to
+        leave msg = pulse.message.body
         
-        if (msg === this.prefix + 'ping') {
-            const start = Date.now();
+        match msg with prefix + 'ping':
+            leave start = clock.now()
             
-            await kan.send({
+            wait kan.send({
                 to: to,
                 text: '🏓 ¡Pong! Kazuma activo.'
-            });
+            })
             
-            const end = Date.now();
-            const latency = end - start;
+            leave end = clock.now()
+            leave latency = end - start
             
-            await kan.send({
+            wait kan.send({
                 to: to,
                 text: '📊 Latencia: ' + latency + 'ms'
-            });
+            })
             
-            await kan.send({
+            wait kan.send({
                 to: to,
-                text: '🤖 ' + this.name + ' v' + this.version + ' - ¡Todo funciona!'
-            });
+                text: '🤖 ' + name + ' v' + version + ' - ¡Todo funciona!'
+            })
             
-            return;
-        } else {
-            await kan.send({
+            done
+        
+        otherwise:
+            wait kan.send({
                 to: to,
-                text: '❌ Usa: ' + this.prefix + 'ping'
-            });
-        }
+                text: '❌ Usa: ' + prefix + 'ping'
+            })
     }
-}
 
-module.exports = PingCommand;
+export PingCommand
