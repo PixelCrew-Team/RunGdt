@@ -1,236 +1,137 @@
-class Transpiler {
-  constructor() {
-    this.jsCode = '';
-    this.indent = 0;
-  }
-
-  async transpile(file) {
-    const fs = require('fs-extra');
-    const { Lexer } = require('./lexer');
-    const { Parser } = require('./parser');
-
-    const code = await fs.readFile(file, 'utf8');
-    const lexer = new Lexer();
-    const tokens = lexer.tokenize(code);
-    const parser = new Parser();
-    const ast = parser.parse(tokens);
-
-    this.jsCode = '';
-    this.indent = 0;
-    this.generate(ast);
-
-    return this.jsCode;
-  }
-
-  generate(node) {
-    switch (node.type) {
-      case 'Program':
-        this.generateProgram(node);
-        break;
-      case 'ImportDeclaration':
-        this.generateImport(node);
-        break;
-      case 'ClassDeclaration':
-        this.generateClass(node);
-        break;
-      case 'FunctionDeclaration':
-        this.generateFunction(node);
-        break;
-      case 'ExportDeclaration':
-        this.generateExport(node);
-        break;
-      case 'IfStatement':
-        this.generateIf(node);
-        break;
-      case 'TryStatement':
-        this.generateTry(node);
-        break;
-      case 'AwaitExpression':
-        this.generateAwait(node);
-        break;
-      case 'ReturnStatement':
-        this.generateReturn(node);
-        break;
-      case 'VariableDeclaration':
-        this.generateVariable(node);
-        break;
-      case 'CallExpression':
-        this.generateCall(node);
-        break;
-      case 'PropertyDefinition':
-        this.generateProperty(node);
-        break;
-      default:
-        this.jsCode += '/* Sin implementar: ' + node.type + ' */\n';
-    }
-  }
-
-  generateProgram(node) {
-    node.body.forEach(statement => {
-      this.generate(statement);
-    });
-  }
-
-  generateImport(node) {
-    let imports = '';
-    if (node.specifiers.length === 1) {
-      imports = node.specifiers[0].local;
-    } else {
-      imports = node.specifiers.map(s => s.local).join(', ');
-    }
-    this.jsCode += `const { ${imports} } = require('${node.source}');\n`;
-  }
-
-  generateClass(node) {
-    this.jsCode += `class ${node.name} {\n`;
-    this.indent++;
-    
-    node.body.forEach(member => {
-      if (member.type === 'PropertyDefinition') {
-        this.generateProperty(member);
-      } else if (member.type === 'FunctionDeclaration') {
-        this.generateFunction(member);
-      }
-    });
-
-    this.indent--;
-    this.jsCode += `}\n\n`;
-  }
-
-  generateProperty(node) {
-    this.jsCode += this.getIndent();
-    this.jsCode += `this.${node.key} = `;
-    this.generate(node.value);
-    this.jsCode += ';\n';
-  }
-
-  generateFunction(node) {
-    this.jsCode += this.getIndent();
-    if (node.async) this.jsCode += 'async ';
-    this.jsCode += `${node.name}(${node.params.join(', ')}) {\n`;
-    this.indent++;
-    
-    node.body.forEach(statement => {
-      this.generate(statement);
-    });
-
-    this.indent--;
-    this.jsCode += this.getIndent() + '}\n\n';
-  }
-
-  generateExport(node) {
-    if (node.declaration.type === 'ClassDeclaration') {
-      this.jsCode += `module.exports = ${node.declaration.name};\n`;
-    } else if (node.declaration.type === 'FunctionDeclaration') {
-      this.jsCode += `module.exports.${node.declaration.name} = ${node.declaration.name};\n`;
-    }
-  }
-
-  generateIf(node) {
-    this.jsCode += this.getIndent() + 'if (';
-    this.generate(node.condition);
-    this.jsCode += ') {\n';
-    this.indent++;
-    
-    node.consequent.forEach(statement => {
-      this.generate(statement);
-    });
-
-    this.indent--;
-    this.jsCode += this.getIndent() + '}';
-
-    if (node.alternate) {
-      this.jsCode += ' else {\n';
-      this.indent++;
-      node.alternate.forEach(statement => {
-        this.generate(statement);
-      });
-      this.indent--;
-      this.jsCode += this.getIndent() + '}';
-    }
-
-    this.jsCode += '\n';
-  }
-
-  generateTry(node) {
-    this.jsCode += this.getIndent() + 'try {\n';
-    this.indent++;
-    
-    node.body.forEach(statement => {
-      this.generate(statement);
-    });
-
-    this.indent--;
-    this.jsCode += this.getIndent() + '}';
-
-    if (node.handler) {
-      this.jsCode += ` catch(${node.handler.param}) {\n`;
-      this.indent++;
-      node.handler.body.forEach(statement => {
-        this.generate(statement);
-      });
-      this.indent--;
-      this.jsCode += this.getIndent() + '}';
-    }
-
-    this.jsCode += '\n';
-  }
-
-  generateAwait(node) {
-    this.jsCode += 'await ';
-    this.generate(node.argument);
-  }
-
-  generateReturn(node) {
-    this.jsCode += this.getIndent() + 'return ';
-    this.generate(node.argument);
-    this.jsCode += ';\n';
-  }
-
-  generateVariable(node) {
-    this.jsCode += this.getIndent() + `const ${node.name} = `;
-    this.generate(node.value);
-    this.jsCode += ';\n';
-  }
-
-  generateCall(node) {
-    if (node.callee === 'sist.sux') {
-      this.jsCode += 'console.log';
-    } else if (node.callee === 'sist.krx') {
-      this.jsCode += 'console.error';
-    } else if (node.callee === 'temp.sombx') {
-      this.jsCode += 'setTimeout';
-    } else {
-      this.jsCode += node.callee;
-    }
-    this.jsCode += '(';
-    this.jsCode += node.arguments.map(arg => {
-      let str = '';
-      this.generate(arg);
-      return str;
-    }).join(', ');
-    this.jsCode += ')';
-  }
-
-  generateIdentifier(node) {
-    this.jsCode += node.name;
-  }
-
-  generateStringLiteral(node) {
-    this.jsCode += `'${node.value}'`;
-  }
-
-  generateNumericLiteral(node) {
-    this.jsCode += node.value;
-  }
-
-  generateBooleanLiteral(node) {
-    this.jsCode += node.value;
-  }
-
-  getIndent() {
-    return '  '.repeat(this.indent);
-  }
+const { lexer } = require('./lexer');
+const { Parser } = require('./parser');
+function transpile(code) {
+    const tokens = lexer(code);
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+    return generateJS(ast);
 }
-
-module.exports = { Transpiler };
+function generateJS(ast) {
+    let output = '';
+    for (const node of ast.body) {
+        output += generateNode(node) + '\n';
+    }
+    return output;
+}
+function generateNode(node) {
+    if (!node) return '';
+    switch (node.type) {
+        case 'ImportDeclaration':
+            return generateImport(node);
+        case 'ExportDeclaration':
+            return 'module.exports = ' + node.name + ';';
+        case 'ClassDeclaration':
+            return generateClass(node);
+        case 'MetaDeclaration':
+            return '';
+        case 'FunctionDeclaration':
+            return generateFunction(node);
+        case 'VariableDeclaration':
+            return 'let ' + node.name + ' = ' + generateNode(node.value) + ';';
+        case 'AwaitExpression':
+            return 'await ' + generateNode(node.argument);
+        case 'ReturnStatement':
+            return 'return ' + (node.argument ? generateNode(node.argument) : '') + ';';
+        case 'MatchStatement':
+            return generateMatch(node);
+        case 'TryStatement':
+            return generateTry(node);
+        case 'EachStatement':
+            return generateEach(node);
+        case 'Identifier':
+            return node.name;
+        case 'NumericLiteral':
+            return node.value;
+        case 'StringLiteral':
+            return '"' + node.value + '"';
+        case 'BooleanLiteral':
+            return node.value;
+        case 'NullLiteral':
+            return 'null';
+        case 'ObjectLiteral':
+            return generateObject(node);
+        case 'ArrayLiteral':
+            return '[' + node.elements.map(e => generateNode(e)).join(', ') + ']';
+        default:
+            return '';
+    }
+}
+function generateImport(node) {
+    const imports = node.imports.map(i => {
+        if (i.alias) {
+            return i.name + ' as ' + i.alias;
+        }
+        return i.name;
+    }).join(', ');
+    if (node.imports.length === 1 && !node.imports[0].alias) {
+        return 'const ' + node.imports[0].name + ' = require(\'' + node.source + '\');';
+    }
+    return 'const { ' + imports + ' } = require(\'' + node.source + '\');';
+}
+function generateClass(node) {
+    let output = 'class ' + node.name + ' {\n';
+    output += '    constructor() {\n';
+    for (const prop of node.properties) {
+        output += '        this.' + prop.key + ' = ' + generateNode(prop.value) + ';\n';
+    }
+    output += '    }\n';
+    output += '}\n';
+    return output;
+}
+function generateFunction(node) {
+    const params = node.params.map(p => p.name).join(', ');
+    let output = 'async function ' + node.name + '(' + params + ') {\n';
+    for (const stmt of node.body) {
+        output += '    ' + generateNode(stmt) + '\n';
+    }
+    output += '}';
+    return output;
+}
+function generateMatch(node) {
+    let output = 'if (' + generateNode(node.condition) + ') {\n';
+    for (const branch of node.branches) {
+        output += '    if (' + generateNode(branch.test) + ') {\n';
+        for (const stmt of branch.body) {
+            output += '        ' + generateNode(stmt) + '\n';
+        }
+        output += '    } else ';
+    }
+    if (node.alternate) {
+        output += '{\n';
+        for (const stmt of node.alternate) {
+            output += '        ' + generateNode(stmt) + '\n';
+        }
+        output += '    }\n';
+    }
+    output += '}';
+    return output;
+}
+function generateTry(node) {
+    let output = 'try {\n';
+    for (const stmt of node.body) {
+        output += '    ' + generateNode(stmt) + '\n';
+    }
+    output += '} catch (' + node.param + ') {\n';
+    if (node.catchBody) {
+        for (const stmt of node.catchBody) {
+            output += '    ' + generateNode(stmt) + '\n';
+        }
+    }
+    output += '}';
+    return output;
+}
+function generateEach(node) {
+    let output = 'for (const ' + node.item + ' of ' + generateNode(node.iterable) + ') {\n';
+    for (const stmt of node.body) {
+        output += '    ' + generateNode(stmt) + '\n';
+    }
+    output += '}';
+    return output;
+}
+function generateObject(node) {
+    const props = node.properties.map(p => {
+        return p.key + ': ' + generateNode(p.value);
+    });
+    return '{ ' + props.join(', ') + ' }';
+}
+module.exports = { transpile };
