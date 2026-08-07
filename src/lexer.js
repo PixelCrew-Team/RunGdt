@@ -1,161 +1,219 @@
-class Lexer {
-  constructor() {
-    this.tokens = [];
-    this.position = 0;
-    this.code = '';
-  }
-
-  tokenize(code) {
-    this.code = code;
-    this.tokens = [];
-    this.position = 0;
-
-    while (this.position < this.code.length) {
-      const char = this.code[this.position];
-
-      // Comentarios
-      if (char === '(') {
-        this.readComment();
-        continue;
-      }
-
-      // Palabras clave GetDomit
-      const word = this.readWord();
-      if (word) {
-        const tokenType = this.getTokenType(word);
-        this.tokens.push({ type: tokenType, value: word });
-        continue;
-      }
-
-      // Símbolos
-      if (char === '=') {
-        this.tokens.push({ type: 'ASSIGN', value: '=' });
-        this.position++;
-        continue;
-      }
-
-      if (char === ':') {
-        this.tokens.push({ type: 'COLON', value: ':' });
-        this.position++;
-        continue;
-      }
-
-      if (char === '{' || char === '}' || char === '[' || char === ']' || 
-          char === '(' || char === ')' || char === ',' || char === '.' || char === ';') {
-        this.tokens.push({ type: 'SYMBOL', value: char });
-        this.position++;
-        continue;
-      }
-
-      // Strings
-      if (char === '"' || char === "'") {
-        const string = this.readString(char);
-        this.tokens.push({ type: 'STRING', value: string });
-        continue;
-      }
-
-      // Números
-      if (char >= '0' && char <= '9') {
-        const number = this.readNumber();
-        this.tokens.push({ type: 'NUMBER', value: number });
-        continue;
-      }
-
-      // Espacios en blanco
-      if (char === ' ' || char === '\n' || char === '\t' || char === '\r') {
-        this.position++;
-        continue;
-      }
-
-      // Error
-      throw new Error(`Token desconocido: ${char} en posición ${this.position}`);
+function lexer(code) {
+    const tokens = [];
+    let pos = 0;
+    while (pos < code.length) {
+        const char = code[pos];
+        if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+            pos++;
+            continue;
+        }
+        if (char === '(' && code[pos + 1] === ' ') {
+            let start = pos;
+            pos += 2;
+            while (pos < code.length && !(code[pos] === ')' && code[pos - 1] === ' ')) {
+                pos++;
+            }
+            tokens.push({ type: 'COMMENT', value: code.substring(start + 2, pos) });
+            pos++;
+            continue;
+        }
+        if (char === '(' && code[pos + 1] !== ' ') {
+            pos++;
+            tokens.push({ type: 'LPAREN', value: '(' });
+            continue;
+        }
+        if (char === ')') {
+            pos++;
+            tokens.push({ type: 'RPAREN', value: ')' });
+            continue;
+        }
+        if (char === '{') {
+            pos++;
+            tokens.push({ type: 'LBRACE', value: '{' });
+            continue;
+        }
+        if (char === '}') {
+            pos++;
+            tokens.push({ type: 'RBRACE', value: '}' });
+            continue;
+        }
+        if (char === '[') {
+            pos++;
+            tokens.push({ type: 'LBRACKET', value: '[' });
+            continue;
+        }
+        if (char === ']') {
+            pos++;
+            tokens.push({ type: 'RBRACKET', value: ']' });
+            continue;
+        }
+        if (char === ':') {
+            pos++;
+            tokens.push({ type: 'COLON', value: ':' });
+            continue;
+        }
+        if (char === ',') {
+            pos++;
+            tokens.push({ type: 'COMMA', value: ',' });
+            continue;
+        }
+        if (char === ';') {
+            pos++;
+            tokens.push({ type: 'SEMICOLON', value: ';' });
+            continue;
+        }
+        if (char === '=') {
+            pos++;
+            if (code[pos] === '=') {
+                pos++;
+                tokens.push({ type: 'EQ_EQ', value: '==' });
+            } else if (code[pos] === '>') {
+                pos++;
+                tokens.push({ type: 'ARROW', value: '=>' });
+            } else {
+                tokens.push({ type: 'EQ', value: '=' });
+            }
+            continue;
+        }
+        if (char === '!') {
+            pos++;
+            if (code[pos] === '=') {
+                pos++;
+                tokens.push({ type: 'NOT_EQ', value: '!=' });
+            } else {
+                tokens.push({ type: 'NOT', value: '!' });
+            }
+            continue;
+        }
+        if (char === '>') {
+            pos++;
+            if (code[pos] === '=') {
+                pos++;
+                tokens.push({ type: 'GTE', value: '>=' });
+            } else {
+                tokens.push({ type: 'GT', value: '>' });
+            }
+            continue;
+        }
+        if (char === '<') {
+            pos++;
+            if (code[pos] === '=') {
+                pos++;
+                tokens.push({ type: 'LTE', value: '<=' });
+            } else {
+                tokens.push({ type: 'LT', value: '<' });
+            }
+            continue;
+        }
+        if (char === '+') {
+            pos++;
+            if (code[pos] === '+') {
+                pos++;
+                tokens.push({ type: 'INCREMENT', value: '++' });
+            } else {
+                tokens.push({ type: 'PLUS', value: '+' });
+            }
+            continue;
+        }
+        if (char === '-') {
+            pos++;
+            if (code[pos] === '-') {
+                pos++;
+                tokens.push({ type: 'DECREMENT', value: '--' });
+            } else if (code[pos] === '>') {
+                pos++;
+                tokens.push({ type: 'ARROW', value: '->' });
+            } else {
+                tokens.push({ type: 'MINUS', value: '-' });
+            }
+            continue;
+        }
+        if (char === '*') {
+            pos++;
+            tokens.push({ type: 'STAR', value: '*' });
+            continue;
+        }
+        if (char === '/') {
+            pos++;
+            tokens.push({ type: 'SLASH', value: '/' });
+            continue;
+        }
+        if (char === '%') {
+            pos++;
+            tokens.push({ type: 'MOD', value: '%' });
+            continue;
+        }
+        if (char === '?') {
+            pos++;
+            if (code[pos] === ':') {
+                pos++;
+                tokens.push({ type: 'ELVIS', value: '?:' });
+            } else {
+                tokens.push({ type: 'QUESTION', value: '?' });
+            }
+            continue;
+        }
+        if (char === '~') {
+            pos++;
+            if (code[pos] === '>') {
+                pos++;
+                tokens.push({ type: 'META', value: '~>' });
+            }
+            continue;
+        }
+        if (char === '"' || char === "'") {
+            const quote = char;
+            pos++;
+            let start = pos;
+            while (pos < code.length && code[pos] !== quote) {
+                if (code[pos] === '\\') pos++;
+                pos++;
+            }
+            const value = code.substring(start, pos);
+            pos++;
+            tokens.push({ type: 'STRING', value: value });
+            continue;
+        }
+        if (/[0-9]/.test(char)) {
+            let start = pos;
+            while (pos < code.length && /[0-9.]/.test(code[pos])) {
+                pos++;
+            }
+            tokens.push({ type: 'NUMBER', value: code.substring(start, pos) });
+            continue;
+        }
+        if (/[a-zA-Z_]/.test(char)) {
+            let start = pos;
+            while (pos < code.length && /[a-zA-Z0-9_]/.test(code[pos])) {
+                pos++;
+            }
+            const value = code.substring(start, pos);
+            const keywords = {
+                'bring': 'BRING',
+                'export': 'EXPORT',
+                'define': 'DEFINE',
+                'own': 'OWN',
+                'leave': 'LEAVE',
+                'match': 'MATCH',
+                'otherwise': 'OTHERWISE',
+                'wait': 'WAIT',
+                'done': 'DONE',
+                'trap': 'TRAP',
+                'each': 'EACH',
+                'async': 'ASYNC',
+                'type': 'TYPE',
+                'true': 'TRUE',
+                'false': 'FALSE',
+                'null': 'NULL'
+            };
+            tokens.push({
+                type: keywords[value] || 'IDENTIFIER',
+                value: value
+            });
+            continue;
+        }
+        throw new Error('Caracter inesperado: ' + char + ' en posición ' + pos);
     }
-
-    this.tokens.push({ type: 'EOF', value: null });
-    return this.tokens;
-  }
-
-  readComment() {
-    this.position++; // Saltar '('
-    const start = this.position;
-    while (this.position < this.code.length && this.code[this.position] !== ')') {
-      this.position++;
-    }
-    if (this.position < this.code.length) {
-      this.position++; // Saltar ')'
-    }
-  }
-
-  readWord() {
-    const start = this.position;
-    while (this.position < this.code.length && 
-           /[a-zA-Z0-9_\-]/.test(this.code[this.position])) {
-      this.position++;
-    }
-    if (this.position > start) {
-      return this.code.substring(start, this.position);
-    }
-    return null;
-  }
-
-  getTokenType(word) {
-    const keywords = {
-      'traereg': 'IMPORT',
-      'pós': 'FROM',
-      'ordreg': 'CLASS',
-      'ejecutax': 'FUNCTION',
-      'asincrog': 'ASYNC',
-      'etemdreg': 'TRY',
-      'faixtg': 'CATCH',
-      'sieg': 'IF',
-      'no': 'NOT',
-      'y': 'AND',
-      'o': 'OR',
-      'verdag': 'TRUE',
-      'falsx': 'FALSE',
-      'enviareg': 'EXPORT',
-      'esperax': 'AWAIT',
-      'cadaen': 'FOR_EACH',
-      'recorx': 'FOR',
-      'mientrax': 'WHILE',
-      'cikla': 'LOOP',
-      'rompx': 'BREAK',
-      'saltax': 'CONTINUE',
-      'retorna': 'RETURN',
-      'creax': 'NEW',
-      'borrax': 'DELETE',
-      'sist': 'SYSTEM',
-      'temp': 'TIMER',
-      'net-': 'PROPERTY',
-      'le-': 'VARIABLE'
-    };
-
-    // Verificar prefijos
-    if (word.startsWith('net-')) return 'PROPERTY';
-    if (word.startsWith('le-')) return 'VARIABLE';
-
-    return keywords[word] || 'IDENTIFIER';
-  }
-
-  readString(quote) {
-    this.position++; // Saltar comilla
-    const start = this.position;
-    while (this.position < this.code.length && this.code[this.position] !== quote) {
-      if (this.code[this.position] === '\\') this.position++;
-      this.position++;
-    }
-    const value = this.code.substring(start, this.position);
-    this.position++; // Saltar comilla de cierre
-    return value;
-  }
-
-  readNumber() {
-    const start = this.position;
-    while (this.position < this.code.length && /[0-9.]/.test(this.code[this.position])) {
-      this.position++;
-    }
-    return parseFloat(this.code.substring(start, this.position));
-  }
+    return tokens;
 }
-
-module.exports = { Lexer };
+module.exports = { lexer };
