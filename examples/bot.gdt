@@ -1,0 +1,44 @@
+( ========================================== )
+( bot.gdt - Ejemplo de bot en GetDomit )
+( ========================================== )
+
+bring { makeWASocket } from '@whiskeysockets/baileys'
+bring fs from 'fs-extra'
+bring config from './config.gdt'
+
+define KazumaBot [
+    name: 'Kazuma',
+    version: '1.0.0',
+    prefix: '!'
+]
+
+async start(kan) :: Void => {
+    console.log('🚀 ' + own.name + ' v' + own.version + ' iniciando...')
+    
+    leave conn = makeWASocket({
+        printQRInTerminal: true,
+        auth: { creds: {}, keys: {} }
+    })
+    
+    conn.ev.on('messages.upsert', async (update) => {
+        leave msg = update.messages[0]
+        match msg and msg.message:
+            wait handleMessage(conn, msg)
+    })
+    
+    console.log('✅ Bot listo!')
+    done conn
+}
+
+async handleMessage(conn, msg) :: Void => {
+    leave text = msg.message.conversation or ''
+    
+    match text.startsWith(own.prefix + 'ping'):
+        wait conn.sendMessage(msg.key.remoteJid, {
+            text: '🏓 ¡Pong! ' + own.name + ' activo.'
+        })
+    otherwise:
+        done
+}
+
+export KazumaBot
