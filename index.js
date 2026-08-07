@@ -1,11 +1,11 @@
-const { Runtime } = require('./src/runtime');
-const { Transpiler } = require('./src/transpiler');
-const { Lexer } = require('./src/lexer');
-const { Parser } = require('./src/parser');
-
+// index.js
+const { registerGDTExtension } = require('./src/runtime');
+registerGDTExtension();
 module.exports = {
-  Runtime,
-  Transpiler,
-  Lexer,
-  Parser
+    registerGDTExtension,
+    version: require('./package.json').version
 };
+if (require.main === module) {
+    console.log('🚀 NodeGDT v' + require('./package.json').version);
+    console.log('📦 Run GetDomit files with: nodegdt run <file.gdt>');
+}
