@@ -1,311 +1,386 @@
 class Parser {
-  constructor() {
-    this.tokens = [];
-    this.position = 0;
-  }
-
-  parse(tokens) {
-    this.tokens = tokens;
-    this.position = 0;
-    return this.parseProgram();
-  }
-
-  parseProgram() {
-    const nodes = [];
-    while (this.current().type !== 'EOF') {
-      const node = this.parseStatement();
-      if (node) nodes.push(node);
+    constructor(tokens) {
+        this.tokens = tokens;
+        this.pos = 0;
     }
-    return { type: 'Program', body: nodes };
-  }
-
-  current() {
-    return this.tokens[this.position] || { type: 'EOF', value: null };
-  }
-
-  peek() {
-    return this.tokens[this.position + 1] || { type: 'EOF', value: null };
-  }
-
-  consume(type) {
-    if (this.current().type === type) {
-      const token = this.current();
-      this.position++;
-      return token;
+    peek() {
+        return this.tokens[this.pos] || null;
     }
-    throw new Error(`Esperaba ${type}, encontró ${this.current().type}`);
-  }
-
-  parseStatement() {
-    const token = this.current();
-
-    switch (token.type) {
-      case 'IMPORT':
-        return this.parseImport();
-      case 'CLASS':
-        return this.parseClass();
-      case 'FUNCTION':
-        return this.parseFunction();
-      case 'EXPORT':
-        return this.parseExport();
-      case 'IF':
-        return this.parseIf();
-      case 'TRY':
-        return this.parseTry();
-      case 'AWAIT':
-        return this.parseAwait();
-      case 'RETURN':
-        return this.parseReturn();
-      case 'VARIABLE':
-        return this.parseVariable();
-      default:
+    next() {
+        return this.tokens[this.pos++] || null;
+    }
+    expect(type) {
+        const token = this.next();
+        if (!token || token.type !== type) {
+            throw new Error('Esperaba ' + type + ', encontró ' + (token ? token.type : 'EOF'));
+        }
+        return token;
+    }
+    parse() {
+        const ast = {
+            type: 'Program',
+            body: []
+        };
+        while (this.peek()) {
+            const statement = this.parseStatement();
+            if (statement) {
+                ast.body.push(statement);
+            }
+        }
+        return ast;
+    }
+    parseStatement() {
+        const token = this.peek();
+        if (!token) return null;
+        if (token.type === 'BRING') {
+            return this.parseBring();
+        }
+        if (token.type === 'DEFINE') {
+            return this.parseDefine();
+        }
+        if (token.type === 'EXPORT') {
+            return this.parseExport();
+        }
+        if (token.type === 'IDENTIFIER' && this.tokens[this.pos + 1]?.type === 'META') {
+            return this.parseMeta();
+        }
+        if (token.type === 'ASYNC') {
+            return this.parseFunction();
+        }
         return this.parseExpression();
     }
-  }
-
-  parseImport() {
-    this.consume('IMPORT');
-    const imports = [];
-    if (this.current().value === '{') {
-      this.consume('SYMBOL');
-      while (this.current().type !== 'SYMBOL' || this.current().value !== '}') {
-        const name = this.consume('IDENTIFIER');
-        imports.push({ type: 'ImportSpecifier', local: name.value });
-        if (this.current().type === 'SYMBOL' && this.current().value === ',') {
-          this.consume('SYMBOL');
+    parseBring() {
+        this.expect('BRING');
+        const token = this.peek();
+        let imports = [];
+        let source = '';
+        if (token.type === 'IDENTIFIER') {
+            const name = this.next().value;
+            if (this.peek()?.type === 'COMMA') {
+                this.expect('COMMA');
+                imports = [{ name }];
+                while (this.peek()?.type === 'IDENTIFIER') {
+                    imports.push({ name: this.next().value });
+                    if (this.peek()?.type === 'COMMA') {
+                        this.expect('COMMA');
+                    } else {
+                        break;
+                    }
+                }
+                this.expect('FROM');
+                source = this.expect('STRING').value;
+            } else if (this.peek()?.type === 'FROM') {
+                this.expect('FROM');
+                source = this.expect('STRING').value;
+                imports = [{ name }];
+            } else {
+                source = this.expect('STRING').value;
+                imports = [{ name }];
+            }
+        } else if (token.type === 'LBRACE') {
+            this.expect('LBRACE');
+            while (this.peek()?.type !== 'RBRACE') {
+                const name = this.expect('IDENTIFIER').value;
+                let alias = null;
+                if (this.peek()?.type === 'AS') {
+                    this.expect('AS');
+                    alias = this.expect('IDENTIFIER').value;
+                }
+                imports.push({ name, alias });
+                if (this.peek()?.type === 'COMMA') {
+                    this.expect('COMMA');
+                } else {
+                    break;
+                }
+            }
+            this.expect('RBRACE');
+            this.expect('FROM');
+            source = this.expect('STRING').value;
         }
-      }
-      this.consume('SYMBOL'); // '}'
-    } else {
-      const name = this.consume('IDENTIFIER');
-      imports.push({ type: 'ImportDefault', local: name.value });
-    }
-
-    this.consume('FROM');
-    const source = this.consume('STRING');
-
-    return {
-      type: 'ImportDeclaration',
-      specifiers: imports,
-      source: source.value
-    };
-  }
-
-  parseClass() {
-    this.consume('CLASS');
-    const name = this.consume('IDENTIFIER');
-    const body = [];
-
-    // Propiedades y métodos
-    while (this.current().type !== 'EOF') {
-      if (this.current().type === 'PROPERTY') {
-        const prop = this.consume('PROPERTY');
-        this.consume('ASSIGN');
-        const value = this.parseExpression();
-        body.push({
-          type: 'PropertyDefinition',
-          key: prop.value.replace('net-', ''),
-          value: value
-        });
-      } else if (this.current().type === 'FUNCTION') {
-        const method = this.parseFunction();
-        body.push(method);
-      } else {
-        break;
-      }
-    }
-
-    return {
-      type: 'ClassDeclaration',
-      name: name.value,
-      body: body
-    };
-  }
-
-  parseFunction() {
-    this.consume('FUNCTION');
-    const isAsync = this.current().type === 'ASYNC';
-    if (isAsync) this.consume('ASYNC');
-
-    const name = this.consume('IDENTIFIER');
-    this.consume('ASSIGN');
-    this.consume('IDENTIFIER'); // 'f'
-    this.consume('COLON');
-
-    // Parámetros
-    const params = [];
-    if (this.current().value === '(') {
-      this.consume('SYMBOL');
-      while (this.current().type !== 'SYMBOL' || this.current().value !== ')') {
-        const param = this.consume('IDENTIFIER');
-        params.push(param.value);
-        if (this.current().type === 'SYMBOL' && this.current().value === ',') {
-          this.consume('SYMBOL');
-        }
-      }
-      this.consume('SYMBOL'); // ')'
-    }
-
-    // Cuerpo
-    const body = [];
-    if (this.current().value === ':') {
-      this.consume('SYMBOL');
-      this.consume('SYMBOL'); // '{'
-      while (this.current().value !== '}') {
-        body.push(this.parseStatement());
-      }
-      this.consume('SYMBOL'); // '}'
-    } else {
-      body.push(this.parseStatement());
-    }
-
-    return {
-      type: 'FunctionDeclaration',
-      name: name.value,
-      async: isAsync,
-      params: params,
-      body: body
-    };
-  }
-
-  parseIf() {
-    this.consume('IF');
-    const condition = this.parseExpression();
-    this.consume('COLON');
-    const consequent = [this.parseStatement()];
-
-    let alternate = null;
-    if (this.current().type === 'IF' || this.current().type === 'NOT') {
-      this.consume('NOT');
-      this.consume('COLON');
-      alternate = [this.parseStatement()];
-    }
-
-    return {
-      type: 'IfStatement',
-      condition: condition,
-      consequent: consequent,
-      alternate: alternate
-    };
-  }
-
-  parseTry() {
-    this.consume('TRY');
-    this.consume('COLON');
-    const body = [];
-
-    while (this.current().type !== 'CATCH' && this.current().type !== 'EOF') {
-      body.push(this.parseStatement());
-    }
-
-    let handler = null;
-    if (this.current().type === 'CATCH') {
-      this.consume('CATCH');
-      const param = this.consume('IDENTIFIER');
-      this.consume('COLON');
-      const catchBody = [];
-      while (this.current().type !== 'EOF' && this.current().value !== '}') {
-        catchBody.push(this.parseStatement());
-      }
-      handler = {
-        type: 'CatchClause',
-        param: param.value,
-        body: catchBody
-      };
-    }
-
-    return {
-      type: 'TryStatement',
-      body: body,
-      handler: handler
-    };
-  }
-
-  parseAwait() {
-    this.consume('AWAIT');
-    const expression = this.parseExpression();
-    return {
-      type: 'AwaitExpression',
-      argument: expression
-    };
-  }
-
-  parseReturn() {
-    this.consume('RETURN');
-    const argument = this.parseExpression();
-    return {
-      type: 'ReturnStatement',
-      argument: argument
-    };
-  }
-
-  parseVariable() {
-    const token = this.consume('VARIABLE');
-    const name = token.value.replace('le-', '');
-    this.consume('ASSIGN');
-    const value = this.parseExpression();
-    return {
-      type: 'VariableDeclaration',
-      name: name,
-      value: value
-    };
-  }
-
-  parseExport() {
-    this.consume('EXPORT');
-    const declaration = this.parseStatement();
-    return {
-      type: 'ExportDeclaration',
-      declaration: declaration
-    };
-  }
-
-  parseExpression() {
-    // Parsear expresión básica
-    const token = this.current();
-
-    if (token.type === 'STRING') {
-      this.position++;
-      return { type: 'StringLiteral', value: token.value };
-    }
-
-    if (token.type === 'NUMBER') {
-      this.position++;
-      return { type: 'NumericLiteral', value: token.value };
-    }
-
-    if (token.type === 'TRUE' || token.type === 'FALSE') {
-      this.position++;
-      return { type: 'BooleanLiteral', value: token.type === 'TRUE' };
-    }
-
-    if (token.type === 'IDENTIFIER' || token.type === 'PROPERTY' || token.type === 'VARIABLE') {
-      this.position++;
-      const name = token.value.replace('net-', '').replace('le-', '');
-      
-      // Llamada a función
-      if (this.current().type === 'SYMBOL' && this.current().value === '(') {
-        this.consume('SYMBOL');
-        const args = [];
-        while (this.current().type !== 'SYMBOL' || this.current().value !== ')') {
-          args.push(this.parseExpression());
-          if (this.current().type === 'SYMBOL' && this.current().value === ',') {
-            this.consume('SYMBOL');
-          }
-        }
-        this.consume('SYMBOL'); // ')'
         return {
-          type: 'CallExpression',
-          callee: name,
-          arguments: args
+            type: 'ImportDeclaration',
+            imports,
+            source
         };
-      }
-
-      return { type: 'Identifier', name: name };
     }
-
-    throw new Error(`Expresión no reconocida: ${token.value}`);
-  }
+    parseDefine() {
+        this.expect('DEFINE');
+        const name = this.expect('IDENTIFIER').value;
+        let properties = [];
+        if (this.peek()?.type === 'LBRACKET') {
+            this.expect('LBRACKET');
+            while (this.peek()?.type !== 'RBRACKET') {
+                const key = this.expect('IDENTIFIER').value;
+                this.expect('COLON');
+                const value = this.parseLiteral();
+                properties.push({ key, value });
+                if (this.peek()?.type === 'COMMA') {
+                    this.expect('COMMA');
+                } else {
+                    break;
+                }
+            }
+            this.expect('RBRACKET');
+        }
+        return {
+            type: 'ClassDeclaration',
+            name,
+            properties
+        };
+    }
+    parseExport() {
+        this.expect('EXPORT');
+        const name = this.expect('IDENTIFIER').value;
+        return {
+            type: 'ExportDeclaration',
+            name
+        };
+    }
+    parseMeta() {
+        const name = this.expect('IDENTIFIER').value;
+        this.expect('META');
+        this.expect('LBRACE');
+        const metadata = {};
+        while (this.peek()?.type !== 'RBRACE') {
+            const key = this.expect('IDENTIFIER').value;
+            this.expect('COLON');
+            const value = this.parseLiteral();
+            metadata[key] = value;
+            if (this.peek()?.type === 'COMMA') {
+                this.expect('COMMA');
+            } else {
+                break;
+            }
+        }
+        this.expect('RBRACE');
+        return {
+            type: 'MetaDeclaration',
+            name,
+            metadata
+        };
+    }
+    parseFunction() {
+        this.expect('ASYNC');
+        const name = this.expect('IDENTIFIER').value;
+        this.expect('LPAREN');
+        const params = [];
+        while (this.peek()?.type !== 'RPAREN') {
+            const param = this.expect('IDENTIFIER').value;
+            let type = null;
+            if (this.peek()?.type === 'DOUBLE_COLON') {
+                this.expect('DOUBLE_COLON');
+                type = this.expect('IDENTIFIER').value;
+            }
+            params.push({ name: param, type });
+            if (this.peek()?.type === 'COMMA') {
+                this.expect('COMMA');
+            } else {
+                break;
+            }
+        }
+        this.expect('RPAREN');
+        let returnType = null;
+        if (this.peek()?.type === 'DOUBLE_COLON') {
+            this.expect('DOUBLE_COLON');
+            returnType = this.expect('IDENTIFIER').value;
+        }
+        this.expect('ARROW');
+        this.expect('LBRACE');
+        const body = this.parseBlock();
+        this.expect('RBRACE');
+        return {
+            type: 'FunctionDeclaration',
+            name,
+            params,
+            returnType,
+            body
+        };
+    }
+    parseBlock() {
+        const statements = [];
+        while (this.peek() && this.peek().type !== 'RBRACE') {
+            statements.push(this.parseStatement());
+        }
+        return statements;
+    }
+    parseExpression() {
+        const token = this.peek();
+        if (token.type === 'IDENTIFIER') {
+            return this.parseIdentifierExpression();
+        }
+        if (token.type === 'NUMBER' || token.type === 'STRING') {
+            return this.parseLiteral();
+        }
+        if (token.type === 'LBRACE') {
+            return this.parseObject();
+        }
+        if (token.type === 'LBRACKET') {
+            return this.parseArray();
+        }
+        if (token.type === 'MATCH') {
+            return this.parseMatch();
+        }
+        if (token.type === 'WAIT') {
+            this.expect('WAIT');
+            return {
+                type: 'AwaitExpression',
+                argument: this.parseExpression()
+            };
+        }
+        if (token.type === 'DONE') {
+            this.expect('DONE');
+            if (this.peek()) {
+                return {
+                    type: 'ReturnStatement',
+                    argument: this.parseExpression()
+                };
+            }
+            return {
+                type: 'ReturnStatement',
+                argument: null
+            };
+        }
+        if (token.type === 'LEAVE') {
+            this.expect('LEAVE');
+            const name = this.expect('IDENTIFIER').value;
+            let type = null;
+            if (this.peek()?.type === 'DOUBLE_COLON') {
+                this.expect('DOUBLE_COLON');
+                type = this.expect('IDENTIFIER').value;
+            }
+            this.expect('EQ');
+            const value = this.parseExpression();
+            return {
+                type: 'VariableDeclaration',
+                name,
+                type,
+                value
+            };
+        }
+        if (token.type === 'TRAP') {
+            return this.parseTrap();
+        }
+        if (token.type === 'EACH') {
+            return this.parseEach();
+        }
+        return this.parseLiteral();
+    }
+    parseLiteral() {
+        const token = this.next();
+        if (token.type === 'NUMBER') {
+            return { type: 'NumericLiteral', value: parseFloat(token.value) };
+        }
+        if (token.type === 'STRING') {
+            return { type: 'StringLiteral', value: token.value };
+        }
+        if (token.type === 'TRUE') {
+            return { type: 'BooleanLiteral', value: true };
+        }
+        if (token.type === 'FALSE') {
+            return { type: 'BooleanLiteral', value: false };
+        }
+        if (token.type === 'NULL') {
+            return { type: 'NullLiteral', value: null };
+        }
+        throw new Error('Literal inesperado: ' + token.type);
+    }
+    parseIdentifierExpression() {
+        const token = this.next();
+        return { type: 'Identifier', name: token.value };
+    }
+    parseObject() {
+        this.expect('LBRACE');
+        const properties = [];
+        while (this.peek()?.type !== 'RBRACE') {
+            const key = this.expect('IDENTIFIER').value;
+            this.expect('COLON');
+            const value = this.parseExpression();
+            properties.push({ key, value });
+            if (this.peek()?.type === 'COMMA') {
+                this.expect('COMMA');
+            } else {
+                break;
+            }
+        }
+        this.expect('RBRACE');
+        return { type: 'ObjectLiteral', properties };
+    }
+    parseArray() {
+        this.expect('LBRACKET');
+        const elements = [];
+        while (this.peek()?.type !== 'RBRACKET') {
+            elements.push(this.parseExpression());
+            if (this.peek()?.type === 'COMMA') {
+                this.expect('COMMA');
+            } else {
+                break;
+            }
+        }
+        this.expect('RBRACKET');
+        return { type: 'ArrayLiteral', elements };
+    }
+    parseMatch() {
+        this.expect('MATCH');
+        const condition = this.parseExpression();
+        this.expect('COLON');
+        const branches = [];
+        while (this.peek() && this.peek().type !== 'OTHERWISE' && this.peek().type !== 'RBRACE') {
+            const test = this.parseExpression();
+            this.expect('COLON');
+            const body = [];
+            while (this.peek() && this.peek().type !== 'IDENTIFIER' && this.peek().type !== 'OTHERWISE' && this.peek().type !== 'RBRACE') {
+                body.push(this.parseStatement());
+            }
+            branches.push({ test, body });
+        }
+        let alternate = null;
+        if (this.peek()?.type === 'OTHERWISE') {
+            this.expect('OTHERWISE');
+            this.expect('COLON');
+            alternate = [];
+            while (this.peek() && this.peek().type !== 'RBRACE') {
+                alternate.push(this.parseStatement());
+            }
+        }
+        return { type: 'MatchStatement', condition, branches, alternate };
+    }
+    parseTrap() {
+        this.expect('TRAP');
+        const param = this.expect('IDENTIFIER').value;
+        this.expect('COLON');
+        const body = [];
+        while (this.peek() && this.peek().type !== 'OTHERWISE' && this.peek().type !== 'RBRACE') {
+            body.push(this.parseStatement());
+        }
+        let catchBody = null;
+        let catchParam = null;
+        if (this.peek()?.type === 'OTHERWISE') {
+            this.expect('OTHERWISE');
+            catchParam = this.expect('IDENTIFIER').value;
+            this.expect('COLON');
+            catchBody = [];
+            while (this.peek() && this.peek().type !== 'RBRACE') {
+                catchBody.push(this.parseStatement());
+            }
+        }
+        return { type: 'TryStatement', param, body, catchParam, catchBody };
+    }
+    parseEach() {
+        this.expect('EACH');
+        const item = this.expect('IDENTIFIER').value;
+        let index = null;
+        if (this.peek()?.type === 'COMMA') {
+            this.expect('COMMA');
+            index = this.expect('IDENTIFIER').value;
+        }
+        this.expect('IN');
+        const iterable = this.parseExpression();
+        this.expect('COLON');
+        const body = [];
+        while (this.peek() && this.peek().type !== 'RBRACE') {
+            body.push(this.parseStatement());
+        }
+        return { type: 'EachStatement', item, index, iterable, body };
+    }
 }
-
 module.exports = { Parser };
