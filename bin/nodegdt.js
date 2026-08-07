@@ -1,69 +1,81 @@
 #!/usr/bin/env node
-
 const { program } = require('commander');
 const chalk = require('chalk');
-const fs = require('fs-extra');
+const fs = require('fs');
 const path = require('path');
-const { Runtime } = require('../src/runtime');
-const { Transpiler } = require('../src/transpiler');
-
-program
-  .name('nodegdt')
-  .description('Runtime para GetDomit - Ejecuta archivos .gdt')
-  .version('1.0.0');
-
-program.command('run')
-  .description('Ejecuta un archivo .gdt')
-  .argument('<file>', 'Archivo .gdt a ejecutar')
-  .option('-w, --watch', 'Modo watch: reinicia al detectar cambios')
-  .action(async (file, options) => {
-    try {
-      const runtime = new Runtime();
-      await runtime.run(file, options);
-    } catch (err) {
-      console.error(chalk.red('❌ Error:'), err.message);
-      process.exit(1);
+const packageJson = require('../package.json');
+program.version(packageJson.version).description('🚀 NodeGDT - Runtime para GetDomit');
+program.command('run <file>').description('Ejecuta un archivo .gdt').option('-w, --watch', 'Modo watch').option('-d, --debug', 'Modo debug').action(async (file, options) => {
+    const filePath = path.resolve(process.cwd(), file);
+    if (!fs.existsSync(filePath)) {
+        console.log(chalk.red('❌ Archivo no encontrado: ' + filePath));
+        process.exit(1);
     }
-  });
-
-program.command('build')
-  .description('Compila .gdt a JavaScript')
-  .argument('<file>', 'Archivo .gdt a compilar')
-  .option('-o, --output <dir>', 'Directorio de salida', 'dist')
-  .action(async (file, options) => {
-    try {
-      const transpiler = new Transpiler();
-      const jsCode = await transpiler.transpile(file);
-      const outputPath = path.join(options.output, path.basename(file).replace('.gdt', '.js'));
-      await fs.ensureDir(options.output);
-      await fs.writeFile(outputPath, jsCode);
-      console.log(chalk.green(`✅ Compilado: ${file} → ${outputPath}`));
-    } catch (err) {
-      console.error(chalk.red('❌ Error:'), err.message);
-      process.exit(1);
+    if (options.debug) {
+        console.log(chalk.blue('[DEBUG] Archivo:', filePath));
     }
-  });
-
-program.command('init')
-  .description('Inicializa un proyecto GetDomit')
-  .action(async () => {
-    const template = {
-      name: 'mi-proyecto-gdt',
-      version: '1.0.0',
-      type: 'module',
-      main: 'index.gdt',
-      scripts: {
-        start: 'nodegdt run index.gdt',
-        dev: 'nodegdt run index.gdt --watch'
-      },
-      dependencies: {
-        nodegdt: '^1.0.0'
-      }
+    try {
+        require('../index.js');
+        console.log(chalk.green('🚀 Ejecutando:', file));
+        require(filePath);
+    } catch (error) {
+        console.log(chalk.red('❌ Error:'), error.message);
+        if (options.debug) {
+            console.log(error.stack);
+        }
+        process.exit(1);
+    }
+});
+program.command('build <file>').description('Compila un archivo .gdt a JavaScript').option('-o, --output <dir>', 'Directorio de salida', './dist').action((file, options) => {
+    const filePath = path.resolve(process.cwd(), file);
+    const { transpile } = require('../src/transpiler');
+    try {
+        const code = fs.readFileSync(filePath, 'utf-8');
+        const jsCode = transpile(code);
+        const outputDir = path.resolve(process.cwd(), options.output);
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+        const outputFile = path.join(outputDir, path.basename(file).replace('.gdt', '.js'));
+        fs.writeFileSync(outputFile, jsCode);
+        console.log(chalk.green('✅ Compilado:', outputFile));
+    } catch (error) {
+        console.log(chalk.red('❌ Error:'), error.message);
+        process.exit(1);
+    }
+});
+program.command('init').description('Crea un nuevo proyecto GetDomit').action(() => {
+    const projectPath = process.cwd();
+    const packagePath = path.join(projectPath, 'package.json');
+    if (fs.existsSync(packagePath)) {
+        console.log(chalk.yellow('⚠️ Ya existe package.json'));
+        return;
+    }
+    const newPackage = {
+        name: path.basename(projectPath),
+        version: '1.0.0',
+        description: 'Proyecto en GetDomit',
+        main: 'index.gdt',
+        scripts: {
+            'start': 'nodegdt run index.gdt',
+            'dev': 'nodegdt run index.gdt --watch'
+        },
+        dependencies: {
+            'nodegdt': '^' + packageJson.version
+        }
     };
-    await fs.writeFile('package.json', JSON.stringify(template, null, 2));
-    await fs.writeFile('index.gdt', `( index.gdt - Mi primer programa GetDomit )\n\ntraereg fs pós 'fs-extra'\n\nordreg MiApp\n    ejecutax asincrog main = f:\n        sist.sux '🚀 Hola GetDomit!'\n\nenviareg MiApp\n\nesperax MiApp.main()`);
-    console.log(chalk.green('✅ Proyecto GetDomit inicializado'));
-    console.log(chalk.cyan('📁 Archivos creados: package.json, index.gdt'));
-  });
+    fs.writeFileSync(packagePath, JSON.stringify(newPackage, null, 2));
+    fs.writeFileSync(path.join(projectPath, 'index.gdt'), `( ========================================== )
+( index.gdt - Proyecto GetDomit )
+( ========================================== )
 
-program.parse();
+console.log('🚀 ¡Hola GetDomit!');
+`);
+    console.log(chalk.green('✅ Proyecto GetDomit creado'));
+    console.log(chalk.blue('📦 Ejecuta: npm install'));
+    console.log(chalk.blue('🚀 Luego: nodegdt run index.gdt'));
+});
+program.parse(process.argv);
+if (!process.argv.slice(2).length) {
+    program.outputHelp();
+}
