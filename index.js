@@ -1,4 +1,3 @@
-// index.js
 const { registerGDTExtension } = require('./src/runtime');
 registerGDTExtension();
 module.exports = {
